@@ -1,0 +1,113 @@
+clear; clc;
+
+sigma = 2;
+gx = 0.105;
+gy = 0.036;
+tau_y = 5;
+
+alpha_vals = [3, 11, 18];
+fixed_points = [0.72, 2.09; 
+                0.93, 2.72; 
+                1.06, 3.09];
+
+is_stable = [true, false, true];
+
+ICs = [0.1, 0.1; 3.0, 0.5; 0.5, 3.0; 2.0, 2.0; 0.3, 2.5; 2.5, 0.3];
+
+tspan = [0 500];
+opts = odeset('RelTol',1e-6,'AbsTol',1e-8);
+
+figure
+
+for a = 1:3
+    
+    alpha_val = alpha_vals(a);
+    
+    f = @(x,y) (1 + x^2 + alpha_val*sigma*x^4) ./ ...
+        ((1 + x^2 + sigma*x^4).*(1 + y^4));
+    
+    odes = @(t, u) [f(u(1),u(2)) - gx*u(1); ...
+                    (f(u(1),u(2)) - gy*u(2)) / tau_y];
+    
+    trajs = cell(6,1);
+    for k = 1:6
+        [~, U] = ode45(odes, tspan, ICs(k,:), opts);
+        trajs{k} = U;
+    end
+    
+    x_vec = linspace(0.05, 2.5, 1000);
+    
+    xnull_arg = (1 + x_vec.^2 + alpha_val*sigma*x_vec.^4) ./ ...
+        (gx .* x_vec .* (1 + x_vec.^2 + sigma*x_vec.^4)) - 1;
+    
+    y_xnull = NaN(size(x_vec));
+    valid = xnull_arg > 0;
+    y_xnull(valid) = xnull_arg(valid).^(1/4);
+    
+    y_ynull = zeros(size(x_vec));
+    for i = 1:length(x_vec)
+        rhs = (1 + x_vec(i)^2 + alpha_val*sigma*x_vec(i)^4) / ...
+              (1 + x_vec(i)^2 + sigma*x_vec(i)^4);
+        fn = @(y) gy*y*(1+y^4) - rhs;
+        y_ynull(i) = fzero(fn, 2.5);
+    end
+    
+    subplot(1,3,a)
+    hold on
+    
+    [Xq, Yq] = meshgrid(linspace(0.1, 2.4, 18), linspace(2.02, 3.45, 18));
+    Uq = zeros(size(Xq));
+    Vq = zeros(size(Yq));
+    
+    for ii = 1:numel(Xq)
+        xval = Xq(ii);
+        yval = Yq(ii);
+        
+        fval = (1 + xval^2 + alpha_val*sigma*xval^4) / ...
+            ((1 + xval^2 + sigma*xval^4)*(1 + yval^4));
+        
+        Uq(ii) = fval - gx*xval;
+        Vq(ii) = (fval - gy*yval) / tau_y;
+    end
+    
+    mag = sqrt(Uq.^2 + Vq.^2);
+    Uq = Uq ./ mag;
+    Vq = Vq ./ mag;
+    
+    quiver(Xq, Yq, Uq, Vq, 0.3, ...
+        'Color', [0.6 0.6 0.6], 'LineWidth', 0.8)
+    
+    plot(x_vec, y_xnull, 'r-', 'LineWidth', 1.5)
+    plot(x_vec, y_ynull, 'b-', 'LineWidth', 1.5)
+    
+    for k = 1:6
+        plot(trajs{k}(:,1), trajs{k}(:,2), 'k-', 'LineWidth', 1)
+    end
+    
+    fp = fixed_points(a,:);
+    
+    if is_stable(a)
+        plot(fp(1), fp(2), 'ko', 'MarkerFaceColor', 'k', 'MarkerSize', 8)
+    else
+        plot(fp(1), fp(2), 'ko', 'MarkerSize', 8)
+    end
+    
+    xlim([0 2.5])
+    ylim([2 3.5])
+    title(['\alpha = ' num2str(alpha_val)])
+    
+    if a == 1
+        ylabel('Y')
+    end
+    xlabel('X')
+    
+    set(gca, 'FontSize', 11)
+    box on
+    hold off
+end
+
+
+legend({'Vector field','x-nullcline','y-nullcline','Trajectories'}, ...
+    'Position',[0.35 0.01 0.3 0.05], 'Orientation','horizontal')
+
+exportgraphics(gcf, 'all_alpha_phaseplots.pdf', 'ContentType', 'vector')
