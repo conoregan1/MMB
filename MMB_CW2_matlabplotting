@@ -1,0 +1,98 @@
+% phase planes and nullclines for the Hasty 2002 model
+% alpha = 3, 11, 18
+
+clear; clc
+
+sigma = 2;
+gx = 0.105;
+gy = 0.036;
+tau_y = 5;
+
+alphas = [3 11 18];
+
+% fixed points read off the EP continuation in MatCont
+fps = [0.72 2.09; 0.93 2.72; 1.06 3.09];
+stable = [1 0 1];
+
+% initial conditions
+ICs = [0.1 0.1
+       3.0 0.5
+       0.5 3.0
+       2.0 2.0
+       0.3 2.5
+       2.5 0.3];
+
+opts = odeset('RelTol',1e-6,'AbsTol',1e-8);
+tspan = [0 500];
+
+figure
+set(gcf,'Position',[100 100 1200 400])
+
+for a = 1:3
+    al = alphas(a);
+
+    % rhs of system
+    rhs = @(t,u) [ (1+u(1)^2+al*sigma*u(1)^4)/((1+u(1)^2+sigma*u(1)^4)*(1+u(2)^4)) - gx*u(1) ;
+                   ((1+u(1)^2+al*sigma*u(1)^4)/((1+u(1)^2+sigma*u(1)^4)*(1+u(2)^4)) - gy*u(2))/tau_y ];
+
+    % integrate from each IC
+    sols = cell(6,1);
+    for k = 1:6
+        [~,U] = ode45(rhs,tspan,ICs(k,:),opts);
+        sols{k} = U;
+    end
+
+    % x-nullcline: y = ( (1+x^2+al*sig*x^4)/(gx*x*(1+x^2+sig*x^4)) - 1 )^(1/4)
+    xs = linspace(0.05,2.5,1000);
+    arg = (1+xs.^2+al*sigma*xs.^4)./(gx*xs.*(1+xs.^2+sigma*xs.^4)) - 1;
+    yx = real(arg.^(1/4));   % drop tiny imaginary parts where arg<0
+    yx(arg<0) = NaN;
+
+    % y-nullcline: solve gy*y*(1+y^4) = (1+x^2+al*sig*x^4)/(1+x^2+sig*x^4) for y at each x
+    yy = zeros(size(xs));
+    for i = 1:length(xs)
+        c = (1+xs(i)^2+al*sigma*xs(i)^4)/(1+xs(i)^2+sigma*xs(i)^4);
+        yy(i) = fzero(@(y) gy*y*(1+y^4) - c, 2.5);
+    end
+
+    % vector field
+    [Xg,Yg] = meshgrid(linspace(0.1,2.4,18),linspace(2.02,3.45,18));
+    U = zeros(size(Xg)); V = zeros(size(Yg));
+    for ii = 1:numel(Xg)
+        x = Xg(ii); y = Yg(ii);
+        f = (1+x^2+al*sigma*x^4)/((1+x^2+sigma*x^4)*(1+y^4));
+        U(ii) = f - gx*x;
+        V(ii) = (f - gy*y)/tau_y;
+    end
+    M = sqrt(U.^2+V.^2);
+    U = U./M; V = V./M;
+
+    % plot
+    subplot(1,3,a)
+    hold on
+    quiver(Xg,Yg,U,V,0.3,'Color',[0.6 0.6 0.6],'LineWidth',0.8)
+    plot(xs,yx,'r-','LineWidth',1.5)
+    plot(xs,yy,'b-','LineWidth',1.5)
+    for k = 1:6
+        plot(sols{k}(:,1),sols{k}(:,2),'k-','LineWidth',1)
+    end
+
+    % fixed point marker
+    if stable(a)
+        plot(fps(a,1),fps(a,2),'ko','MarkerFaceColor','k','MarkerSize',8)
+    else
+        plot(fps(a,1),fps(a,2),'ko','MarkerSize',8)
+    end
+
+    xlim([0 2.5]); ylim([2 3.5])
+    title(['\alpha = ' num2str(al)])
+    xlabel('X')
+    if a==1, ylabel('Y'); end
+    box on
+    hold off
+end
+
+legend({'Vector field','x-nullcline','y-nullcline','Trajectories'}, ...
+       'Position',[0.35 0.01 0.3 0.05],'Orientation','horizontal')
+
+exportgraphics(gcf,'all_alpha_phaseplots.pdf','ContentType','vector')
