@@ -8,10 +8,10 @@ gx = 0.105;
 gy = 0.036;
 tau_y = 5;
 
-alphas = [3 11 18];
+alphas = [3 11 15];
 
 % fixed points read off the EP continuation in MatCont
-fps = [0.72 2.09; 0.93 2.72; 1.06 3.09];
+fps = [0.72 2.09; 0.93 2.72; 1.01 2.95];
 stable = [1 0 1];
 
 % initial conditions
